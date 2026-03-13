@@ -3,3 +3,5 @@ opencv-python
 python-dotenv
 torch
 timm
+scikit-learn
+scipy
