@@ -25,12 +25,11 @@ load_dotenv()
 # Configuration
 # ---------------------------------------------------------------------------
 RTSP_URL = os.getenv("RTSP_URL", "")
-MODEL_PATH = os.getenv("MODEL_PATH", "yolo26n.pt")
+MODEL_PATH = os.getenv("MODEL_PATH", "yolo26n.mlpackage")
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "./data/raw_crops/"))
 CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.7"))
 MAX_RECONNECT_ATTEMPTS = int(os.getenv("MAX_RECONNECT_ATTEMPTS", "10"))
 RECONNECT_DELAY = float(os.getenv("RECONNECT_DELAY", "5"))
-FRAME_SKIP = int(os.getenv("FRAME_SKIP", "1"))
 DEBUG = os.getenv("DEBUG", "False").lower() in ("1", "true", "yes")
 
 # ---------------------------------------------------------------------------
@@ -113,10 +112,9 @@ def run() -> None:
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     log.info("Loading model: %s", MODEL_PATH)
-    model = YOLO(MODEL_PATH)
+    model = YOLO(MODEL_PATH, task="detect")
 
     reconnect_count = 0
-    frame_index = 0
 
     log.info("Connecting to stream: %s", RTSP_URL)
 
@@ -142,10 +140,6 @@ def run() -> None:
                 if not ret:
                     log.warning("Frame read failed — attempting reconnect …")
                     break
-
-                frame_index += 1
-                if frame_index % FRAME_SKIP != 0:
-                    continue
 
                 # Run inference (verbose=False suppresses per-frame YOLO logs)
                 results = model(frame, verbose=False)
