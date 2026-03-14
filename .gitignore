@@ -2,3 +2,6 @@
 .venv/*
 .aider*
 data/*
+raw_videos/*
+dataset/*
+seed_data/*
