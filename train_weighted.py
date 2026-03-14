@@ -32,7 +32,7 @@ RUN_NAME     = "weighted_model"
 DEVICE       = "mps"
 EPOCHS       = 50
 IMG_SIZE     = 224
-BATCH        = 32
+BATCH        = 128
 VAL_FRACTION = 0.15   # 15 % of each class held out for val
 CONF_THRESH  = 0.0    # evaluate all val samples
 IMAGE_EXTS   = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
@@ -162,6 +162,32 @@ def confusion_matrix_report(model: YOLO, val_dir: Path, class_names: list[str]):
     print()
 
 
+# ── Checkpoint sanitiser ──────────────────────────────────────────────────────
+
+def _strip_criterion_from_checkpoint(pt_path: Path):
+    """
+    Removes any custom criterion object from a saved Ultralytics checkpoint.
+
+    Ultralytics pickles the full model object (including model.criterion) into
+    the .pt file.  When WeightedClassificationLoss is defined in __main__ the
+    pickle stream records it as 'c__main__\\nWeightedClassificationLoss', which
+    causes an AttributeError when the checkpoint is loaded in any other script.
+
+    This function loads the file (with WeightedClassificationLoss in scope so
+    unpickling succeeds), sets criterion=None on every top-level model object,
+    then re-saves — producing a portable checkpoint.
+    """
+    ckpt = torch.load(str(pt_path), map_location="cpu", weights_only=False)
+    changed = False
+    for val in ckpt.values():
+        if hasattr(val, "criterion") and val.criterion is not None:
+            val.criterion = None
+            changed = True
+    if changed:
+        torch.save(ckpt, str(pt_path))
+        print(f"  Stripped criterion from {pt_path.name}")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -204,8 +230,14 @@ def main():
     )
     trainer.train()
 
+    # Strip the custom criterion from every saved checkpoint so the .pt files
+    # can be loaded anywhere without needing WeightedClassificationLoss in scope.
+    run_weights_dir = Path(PROJECT) / RUN_NAME / "weights"
+    for pt_path in run_weights_dir.glob("*.pt"):
+        _strip_criterion_from_checkpoint(pt_path)
+
     # 4. Load best weights and run confusion matrix on val split
-    best_pt = Path(PROJECT) / RUN_NAME / "weights" / "best.pt"
+    best_pt = run_weights_dir / "best.pt"
     print(f"\nLoading best weights: {best_pt}")
     best_model = YOLO(str(best_pt))
 

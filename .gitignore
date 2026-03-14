@@ -6,3 +6,4 @@ raw_videos/*
 dataset/*
 seed_data/*
 runs/*
+detections/*
